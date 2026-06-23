@@ -1,0 +1,41 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Data and artifacts (versioned by DVC, not git)
+/data/*.csv
+/data/processed/
+*.joblib
+metrics.json
+
+# MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+mlflow.db-journal
+
+# Build / reports
+build/
+*.html
+
+# Local DVC remote
+/dvcstore/
+
+# RAG / indexes (if added)
+index/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
