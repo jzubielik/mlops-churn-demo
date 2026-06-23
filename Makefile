@@ -15,8 +15,14 @@ export PREFECT_HOME          := $(CURDIR)/.prefect
 export PREFECT_LOGGING_LEVEL := INFO
 export PREFECT_CLI_COLORS    := false
 
+# MLflow: a consistent backend (ABSOLUTE path) for scripts and the UI.
+MLFLOW := $(VENV)/bin/mlflow
+export MLFLOW_TRACKING_URI := sqlite:///$(CURDIR)/mlflow.db
+MLFLOW_PORT ?= 17150
+
 .PHONY: help install patch-py314 test lint clean \
-        data init repro metrics etl etl-bad
+        data init repro metrics etl etl-bad \
+        train tune promote mlflow-ui
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -80,6 +86,20 @@ etl-bad: ## ETL flow on CORRUPTED data (expected validation failure, exit 1)
 		else \
 			echo ">>> ERROR: flow passed but should have failed!"; exit 1; \
 		fi
+
+# --- m05: experiments (MLflow) ---------------------------------------------
+train: ## Run MLflow experiments (several models, churn-clf registry)
+	$(PY) experiments/run.py
+
+tune: ## Optuna hyperparameter tuning (maximize pr_auc)
+	$(PY) experiments/tune_optuna.py
+
+promote: ## Promote the best model (pr_auc) -> alias @production
+	$(PY) experiments/promote.py
+
+mlflow-ui: ## MLflow UI at http://localhost:$(MLFLOW_PORT)
+	$(MLFLOW) ui --backend-store-uri $(MLFLOW_TRACKING_URI) \
+		--default-artifact-root ./mlartifacts --host 0.0.0.0 --port $(MLFLOW_PORT)
 
 clean: ## Remove venv, cache and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage

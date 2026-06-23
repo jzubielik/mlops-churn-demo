@@ -9,7 +9,7 @@ Messages follow the Conventional Commits convention (see `../COMMITS.txt`).
 | m02 | ✅ Data (Telco churn synthesis) + DVC (prepare→train pipeline, local remote) | `make data && make repro` | `feat(data): ...` |
 | m03 | ✅ Feature engineering + model (Pipeline) + train/evaluate + tests (pr_auc floor) | `make test && make lint` | `feat(model): ...` |
 | m04 | ✅ ETL (Prefect: extract→validate→features→load parquet) + contract (Pandera), fail-fast on bad data | `make etl` / `make etl-bad` | `feat(pipeline): ...` |
-| m05 | MLflow tracking + registry + promotion by PR-AUC | `make train && make promote` | `feat(experiments): ...` |
+| m05 | ✅ MLflow tracking + registry (churn-clf) + Optuna + promotion by pr_auc (alias @production) | `make train && make promote` | `feat(experiments): ...` |
 | m06 | Quality gate (PR-AUC) + CI (lint/test/train/gate) | `make ci` | `ci: ...` |
 | m07 | FastAPI serving + Docker + load test + /metrics | serve + curl + loadtest | `feat(serving): ...` |
 | m08 | Monitoring (Prometheus/Grafana) + drift (Evidently) | `make monitor-up` / `make drift` | `feat(monitoring): ...` |
