@@ -5,8 +5,8 @@ Messages follow the Conventional Commits convention (see `../COMMITS.txt`).
 
 | # | Scope | Verification | Commit |
 |---|--------|-------------|--------|
-| m01 | Init + scaffold (pyproject, Makefile, README, .gitignore, LICENSE, PLAN) | `make test` | `chore: initialize ...` |
-| m02 | Data + DVC (ingest/sampling Telco churn, versioning) | `make data && dvc repro` | `feat(data): ...` |
+| m01 | ✅ Init + skeleton (pyproject, Makefile, README, .gitignore, LICENSE, PLAN) | `make test` | `chore: initialize ...` |
+| m02 | ✅ Data (Telco churn synthesis) + DVC (prepare→train pipeline, local remote) | `make data && make repro` | `feat(data): ...` |
 | m03 | Package + feature engineering + tests | `make test && make lint` | `feat(model): ...` |
 | m04 | ETL (Prefect) + contract (Pandera), fail-fast on bad data | `make etl` / `make etl-bad` | `feat(pipeline): ...` |
 | m05 | MLflow tracking + registry + promotion by PR-AUC | `make train && make promote` | `feat(experiments): ...` |
@@ -20,7 +20,7 @@ Messages follow the Conventional Commits convention (see `../COMMITS.txt`).
 | m13 | End-to-end README + diagram + `make demo` | `make demo` | `docs: ...` |
 
 ## Principles
-- Snapshots are built strictly in order and cumulatively (mN+1 = mN + delta).
+- Snapshots built strictly in order and cumulatively (mN+1 = mN + delta).
 - Artifacts (`.venv`, `mlruns/`, `build/`, `*.tfstate`, ...) are not committed to the repo.
-- Dataset: Telco Customer Churn — imbalanced, a realistic KPI, easy to drift.
-- Goal: the whole flow runnable locally and verifiable on a free GH runner.
+- Dataset: Telco Customer Churn — imbalanced, realistic KPI, easy to drift.
+- Goal: the entire flow runnable locally and verifiable on a free GH runner.

@@ -1,0 +1,66 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: python -m churnml.prepare
+    deps:
+    - path: data/raw.csv
+      hash: md5
+      md5: 3f7658104e17499d02ea63b495b91daf
+      size: 975712
+    - path: src/churnml/data.py
+      hash: md5
+      md5: 07a404f8f39668c6215c59f9c5adbd2d
+      size: 1439
+    - path: src/churnml/prepare.py
+      hash: md5
+      md5: e07b4617407b7b8ec832527dca66c7c0
+      size: 1167
+    params:
+      params.yaml:
+        prepare.seed: 42
+        prepare.test_size: 0.2
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: d5dacba6dc1a65db5c013b4b890f383b.dir
+      size: 975972
+      nfiles: 2
+  train:
+    cmd: python -m churnml.train
+    deps:
+    - path: data/processed
+      hash: md5
+      md5: d5dacba6dc1a65db5c013b4b890f383b.dir
+      size: 975972
+      nfiles: 2
+    - path: src/churnml/evaluate.py
+      hash: md5
+      md5: afd913d68b9afcaab8ca1c7121113cf6
+      size: 1066
+    - path: src/churnml/features.py
+      hash: md5
+      md5: b41adf22481b6dea51cd51087031796d
+      size: 2137
+    - path: src/churnml/model.py
+      hash: md5
+      md5: 711a45960ee2fc90941a275f7c7fba06
+      size: 3384
+    - path: src/churnml/train.py
+      hash: md5
+      md5: 09d5e876acc0796094ac468b3a24b4ad
+      size: 2247
+    params:
+      params.yaml:
+        train.C: 1.0
+        train.max_iter: 1000
+        train.model: logreg
+        train.seed: 42
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 591f54e2f60ef80ca46b0eb68acc5baa
+      size: 119
+    - path: model.joblib
+      hash: md5
+      md5: 7b300f2296fa98089ddffc98ccafb03a
+      size: 8769

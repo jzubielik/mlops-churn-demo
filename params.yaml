@@ -1,0 +1,12 @@
+# DVC pipeline parameters. Changing any value makes
+# `dvc repro` re-run the dependent stage.
+
+prepare:
+  test_size: 0.2      # test set fraction
+  seed: 42            # seed (reproducible, stratified split)
+
+train:
+  model: logreg       # "logreg" (balanced logistic regression) or "hgb" (gradient boosting)
+  C: 1.0              # regularization strength for logreg
+  max_iter: 1000
+  seed: 42

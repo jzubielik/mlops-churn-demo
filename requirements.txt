@@ -1,0 +1,32 @@
+# Consolidated project dependencies (loose lower bounds -> cp314 wheels).
+# Install: pip install -r requirements.txt && pip install -e ".[dev]"
+
+# ML core
+scikit-learn>=1.4
+pandas>=2.1
+numpy>=1.26
+joblib>=1.3
+pyyaml>=6.0
+
+# Data / DVC (m02)
+dvc>=3.50
+
+# Pipeline (m04)
+prefect>=3.1
+pandera>=0.22
+pyarrow>=17.0
+
+# Experiments (m05)
+mlflow>=3.1
+optuna>=3.4
+
+# Serving (m07)
+fastapi>=0.115
+uvicorn[standard]>=0.34
+pydantic>=2.10
+prometheus-client>=0.21
+
+# Dev
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.6

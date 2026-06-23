@@ -1,26 +1,65 @@
-# MLOps Churn Demo — helper targets.
-# Further targets (data/train/serve/monitor/...) are added in the next milestones.
+# MLOps Churn Demo — helper targets (developed milestone by milestone).
 
 VENV := .venv
 PY   := $(VENV)/bin/python
 PIP  := $(VENV)/bin/pip
+DVC  := $(VENV)/bin/dvc
 
-.PHONY: help install test lint clean
+REMOTE_DIR := ./dvcstore
+
+# dvc.yaml stages call bare `python` — we prepend .venv/bin to PATH.
+export PATH := $(CURDIR)/$(VENV)/bin:$(PATH)
+
+.PHONY: help install patch-py314 test lint clean \
+        data init repro metrics
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-install: ## Create .venv and install the package with dev dependencies
+install: ## Create .venv and install package + dependencies (requirements.txt)
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
 	$(PIP) install -e ".[dev]"
+	@$(MAKE) --no-print-directory patch-py314
+
+# MLflow compatibility patch for Python 3.14: 'Traversable' was moved from
+# importlib.abc to importlib.resources.abc. Without this MLflow won't start.
+patch-py314: ## Patch MLflow for Python 3.14
+	@f=$$(ls $(VENV)/lib/python3.*/site-packages/mlflow/assistant/skill_installer.py 2>/dev/null); \
+	if [ -n "$$f" ] && grep -q '^from importlib\.abc import Traversable' "$$f"; then \
+		sed -i 's/^from importlib\.abc import Traversable/from importlib.resources.abc import Traversable/' "$$f"; \
+		echo "patch-py314: applied MLflow patch"; \
+	else \
+		echo "patch-py314: nothing to do (already patched or MLflow not installed)"; \
+	fi
 
 test: ## Run tests with coverage
 	$(VENV)/bin/pytest --cov=churnml
 
 lint: ## Static code analysis (ruff)
 	$(VENV)/bin/ruff check .
+
+# --- m02: data + DVC -------------------------------------------------------
+init: ## git init + dvc init + local remote ($(REMOTE_DIR))
+	@test -d .git || git init -q
+	@git config user.email >/dev/null 2>&1 || git config user.email "demo@local"
+	@git config user.name  >/dev/null 2>&1 || git config user.name  "Churn Demo"
+	@test -d .dvc || $(DVC) init -q
+	$(DVC) remote add -d --force localremote $(REMOTE_DIR)
+	@echo "Initialized git + DVC. Remote 'localremote' -> $(REMOTE_DIR)"
+
+data: ## Synthesize data/raw.csv and add it to DVC
+	$(PY) scripts/make_data.py
+	$(DVC) add data/raw.csv
+	@echo "Generated and added data/raw.csv to DVC."
+
+repro: ## Run the DVC pipeline (prepare -> train)
+	$(DVC) repro
+
+metrics: ## Show the pipeline metrics (dvc metrics show)
+	$(DVC) metrics show
 
 clean: ## Remove venv, cache and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage

@@ -1,0 +1,35 @@
+# Reproducible DVC pipeline: prepare -> train.
+# `dvc repro` runs stages according to dependencies (deps/outs). A stage reruns
+# only when its code, input data, or related parameters change.
+
+stages:
+  prepare:
+    cmd: python -m churnml.prepare
+    deps:
+      - src/churnml/prepare.py
+      - src/churnml/data.py
+      - data/raw.csv
+    params:
+      - prepare.test_size
+      - prepare.seed
+    outs:
+      - data/processed
+
+  train:
+    cmd: python -m churnml.train
+    deps:
+      - src/churnml/train.py
+      - src/churnml/model.py
+      - src/churnml/features.py
+      - src/churnml/evaluate.py
+      - data/processed
+    params:
+      - train.model
+      - train.C
+      - train.max_iter
+      - train.seed
+    outs:
+      - model.joblib
+    metrics:
+      - metrics.json:
+          cache: false
