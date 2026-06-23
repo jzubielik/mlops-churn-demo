@@ -1,4 +1,4 @@
-# MLOps Churn Demo — helper targets (developed milestone by milestone).
+# MLOps Churn Demo — helper targets (expanded milestone by milestone).
 
 VENV := .venv
 PY   := $(VENV)/bin/python
@@ -10,19 +10,20 @@ REMOTE_DIR := ./dvcstore
 # dvc.yaml stages call bare `python` — we prepend .venv/bin to PATH.
 export PATH := $(CURDIR)/$(VENV)/bin:$(PATH)
 
-# Prefect should run 100% locally and quietly (no server/telemetry).
+# Prefect must run 100% locally and quietly (no server/telemetry).
 export PREFECT_HOME          := $(CURDIR)/.prefect
 export PREFECT_LOGGING_LEVEL := INFO
 export PREFECT_CLI_COLORS    := false
 
-# MLflow: a consistent backend (ABSOLUTE path) for scripts and the UI.
+# MLflow: consistent backend (ABSOLUTE path) for scripts and UI.
 MLFLOW := $(VENV)/bin/mlflow
 export MLFLOW_TRACKING_URI := sqlite:///$(CURDIR)/mlflow.db
 MLFLOW_PORT ?= 17150
 
 .PHONY: help install patch-py314 test lint clean \
         data init repro metrics etl etl-bad \
-        train tune promote mlflow-ui
+        train tune promote mlflow-ui \
+        train-model gate ci
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -37,13 +38,13 @@ install: ## Create .venv and install package + dependencies (requirements.txt)
 
 # MLflow compatibility patch for Python 3.14: 'Traversable' was moved from
 # importlib.abc to importlib.resources.abc. Without this MLflow won't start.
-patch-py314: ## Patch MLflow for Python 3.14
+patch-py314: ## MLflow patch for Python 3.14
 	@f=$$(ls $(VENV)/lib/python3.*/site-packages/mlflow/assistant/skill_installer.py 2>/dev/null); \
 	if [ -n "$$f" ] && grep -q '^from importlib\.abc import Traversable' "$$f"; then \
 		sed -i 's/^from importlib\.abc import Traversable/from importlib.resources.abc import Traversable/' "$$f"; \
 		echo "patch-py314: applied MLflow patch"; \
 	else \
-		echo "patch-py314: nothing to do (already patched or MLflow not installed)"; \
+		echo "patch-py314: nothing to do (already patched or MLflow missing)"; \
 	fi
 
 test: ## Run tests with coverage
@@ -69,7 +70,7 @@ data: ## Synthesize data/raw.csv and add it to DVC
 repro: ## Run the DVC pipeline (prepare -> train)
 	$(DVC) repro
 
-metrics: ## Show the pipeline metrics (dvc metrics show)
+metrics: ## Show pipeline metrics (dvc metrics show)
 	$(DVC) metrics show
 
 # --- m04: ETL (Prefect) + validation (Pandera) -----------------------------
@@ -82,9 +83,9 @@ etl-bad: ## ETL flow on CORRUPTED data (expected validation failure, exit 1)
 	@$(PY) pipelines/etl_flow.py data/raw_corrupted.csv; \
 		status=$$?; \
 		if [ $$status -ne 0 ]; then \
-			echo ">>> OK: flow stopped by validation (exit $$status) — as expected."; \
+			echo ">>> OK: flow stopped by validation (exit $$status) — as intended."; \
 		else \
-			echo ">>> ERROR: flow passed but should have failed!"; exit 1; \
+			echo ">>> ERROR: flow passed, but it should have failed!"; exit 1; \
 		fi
 
 # --- m05: experiments (MLflow) ---------------------------------------------
@@ -97,11 +98,23 @@ tune: ## Optuna hyperparameter tuning (maximize pr_auc)
 promote: ## Promote the best model (pr_auc) -> alias @production
 	$(PY) experiments/promote.py
 
-mlflow-ui: ## MLflow UI at http://localhost:$(MLFLOW_PORT)
+mlflow-ui: ## MLflow UI na http://localhost:$(MLFLOW_PORT)
 	$(MLFLOW) ui --backend-store-uri $(MLFLOW_TRACKING_URI) \
 		--default-artifact-root ./mlartifacts --host 0.0.0.0 --port $(MLFLOW_PORT)
 
-clean: ## Remove venv, cache and build artifacts
+# --- m06: quality gate + CI ------------------------------------------------
+train-model: ## Synthesize data and train a single model -> model.joblib + metrics.json
+	$(PY) scripts/make_data.py
+	$(PY) -m churnml.prepare
+	$(PY) -m churnml.train
+
+gate: ## Quality gate: blocks when pr_auc <= baseline.txt
+	$(PY) scripts/gate.py --no-promote
+
+ci: lint test train-model gate ## Full pipeline LOCALLY (like GitHub Actions)
+	@echo "[CI] Pipeline OK — model passed the pr_auc gate."
+
+clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type d -name "*.egg-info" -exec rm -rf {} +

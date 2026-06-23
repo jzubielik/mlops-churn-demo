@@ -1,0 +1,66 @@
+name: CI/CD Churn Pipeline
+
+# The same flow as the local `make ci`: lint -> test -> train -> gate (pr_auc)
+# -> build. Everything runs on the free GitHub runner (no data download: the
+# dataset is synthesized deterministically).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest + coverage)
+        run: pytest --cov=churnml --cov-report=term-missing --cov-report=xml
+
+      - name: Synthesize data + train (prepare -> train -> metrics.json)
+        run: |
+          python scripts/make_data.py
+          python -m churnml.prepare
+          python -m churnml.train
+
+      - name: Quality gate (block deploy if pr_auc <= baseline)
+        run: python scripts/gate.py --no-promote
+
+      - name: Build Docker image (serving)
+        if: ${{ hashFiles('serving/Dockerfile') != '' }}
+        run: docker build -t churnml-serving:ci -f serving/Dockerfile .
+
+      - name: Upload metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics
+          path: metrics.json
+
+  # Deploy runs ONLY when the `ci` job (with the quality gate) has passed.
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy (placeholder)
+        run: echo "pr_auc gate passed — deploying the new model (blue-green / canary)."
