@@ -27,6 +27,10 @@ build/
 # Local DVC remote
 /dvcstore/
 
+# Prefect (local state) + Parquet from ETL
+.prefect/
+*.parquet
+
 # RAG / indexes (if added)
 index/
 

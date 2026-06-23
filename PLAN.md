@@ -8,7 +8,7 @@ Messages follow the Conventional Commits convention (see `../COMMITS.txt`).
 | m01 | ✅ Init + skeleton (pyproject, Makefile, README, .gitignore, LICENSE, PLAN) | `make test` | `chore: initialize ...` |
 | m02 | ✅ Data (Telco churn synthesis) + DVC (prepare→train pipeline, local remote) | `make data && make repro` | `feat(data): ...` |
 | m03 | ✅ Feature engineering + model (Pipeline) + train/evaluate + tests (pr_auc floor) | `make test && make lint` | `feat(model): ...` |
-| m04 | ETL (Prefect) + contract (Pandera), fail-fast on bad data | `make etl` / `make etl-bad` | `feat(pipeline): ...` |
+| m04 | ✅ ETL (Prefect: extract→validate→features→load parquet) + contract (Pandera), fail-fast on bad data | `make etl` / `make etl-bad` | `feat(pipeline): ...` |
 | m05 | MLflow tracking + registry + promotion by PR-AUC | `make train && make promote` | `feat(experiments): ...` |
 | m06 | Quality gate (PR-AUC) + CI (lint/test/train/gate) | `make ci` | `ci: ...` |
 | m07 | FastAPI serving + Docker + load test + /metrics | serve + curl + loadtest | `feat(serving): ...` |

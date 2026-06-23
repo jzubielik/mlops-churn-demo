@@ -10,8 +10,13 @@ REMOTE_DIR := ./dvcstore
 # dvc.yaml stages call bare `python` — we prepend .venv/bin to PATH.
 export PATH := $(CURDIR)/$(VENV)/bin:$(PATH)
 
+# Prefect should run 100% locally and quietly (no server/telemetry).
+export PREFECT_HOME          := $(CURDIR)/.prefect
+export PREFECT_LOGGING_LEVEL := INFO
+export PREFECT_CLI_COLORS    := false
+
 .PHONY: help install patch-py314 test lint clean \
-        data init repro metrics
+        data init repro metrics etl etl-bad
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -60,6 +65,21 @@ repro: ## Run the DVC pipeline (prepare -> train)
 
 metrics: ## Show the pipeline metrics (dvc metrics show)
 	$(DVC) metrics show
+
+# --- m04: ETL (Prefect) + validation (Pandera) -----------------------------
+etl: ## ETL flow on CLEAN data (extract->validate->features->load parquet)
+	$(PY) pipelines/etl_flow.py data/raw.csv
+
+etl-bad: ## ETL flow on CORRUPTED data (expected validation failure, exit 1)
+	@$(PY) scripts/make_corrupted.py
+	@echo ">>> Running ETL on CORRUPTED data — validation should stop the flow..."
+	@$(PY) pipelines/etl_flow.py data/raw_corrupted.csv; \
+		status=$$?; \
+		if [ $$status -ne 0 ]; then \
+			echo ">>> OK: flow stopped by validation (exit $$status) — as expected."; \
+		else \
+			echo ">>> ERROR: flow passed but should have failed!"; exit 1; \
+		fi
 
 clean: ## Remove venv, cache and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage
