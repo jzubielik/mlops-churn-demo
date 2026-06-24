@@ -1,0 +1,10 @@
+# Serving image dependencies (loose lower bounds -> cp31x wheels).
+fastapi>=0.115
+uvicorn[standard]>=0.34
+scikit-learn>=1.4
+pandas>=2.1
+numpy>=1.26
+joblib>=1.3
+pydantic>=2.10
+prometheus-client>=0.21
+pyyaml>=6.0

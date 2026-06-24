@@ -20,10 +20,15 @@ MLFLOW := $(VENV)/bin/mlflow
 export MLFLOW_TRACKING_URI := sqlite:///$(CURDIR)/mlflow.db
 MLFLOW_PORT ?= 17150
 
+SERVE_PORT ?= 17100
+SERVE_URL  ?= http://localhost:$(SERVE_PORT)
+IMAGE      ?= churnml-serving:latest
+
 .PHONY: help install patch-py314 test lint clean \
         data init repro metrics etl etl-bad \
         train tune promote mlflow-ui \
-        train-model gate ci
+        train-model gate ci \
+        serve predict loadtest docker-build
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -113,6 +118,22 @@ gate: ## Quality gate: blocks when pr_auc <= baseline.txt
 
 ci: lint test train-model gate ## Full pipeline LOCALLY (like GitHub Actions)
 	@echo "[CI] Pipeline OK — model passed the pr_auc gate."
+
+# --- m07: serving (FastAPI) ------------------------------------------------
+serve: ## Run the FastAPI service (uvicorn) on port $(SERVE_PORT)
+	$(VENV)/bin/uvicorn serving.app:app --host 0.0.0.0 --port $(SERVE_PORT)
+
+predict: ## Example request to /predict (curl)
+	curl -s -X POST $(SERVE_URL)/predict \
+		-H "Content-Type: application/json" \
+		-d '{"gender":"Female","SeniorCitizen":0,"Partner":"Yes","Dependents":"No","tenure":2,"PhoneService":"Yes","MultipleLines":"No","InternetService":"Fiber optic","OnlineSecurity":"No","OnlineBackup":"No","DeviceProtection":"No","TechSupport":"No","StreamingTV":"No","StreamingMovies":"No","Contract":"Month-to-month","PaperlessBilling":"Yes","PaymentMethod":"Electronic check","MonthlyCharges":89.5,"TotalCharges":179.0}'
+	@echo
+
+loadtest: ## Load test for /predict (p50/p95/p99)
+	$(PY) serving/load_test.py --url $(SERVE_URL)/predict -n 2000 -c 50
+
+docker-build: ## Build the multi-stage service image
+	docker build -t $(IMAGE) -f serving/Dockerfile .
 
 clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage
