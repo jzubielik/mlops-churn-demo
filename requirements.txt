@@ -26,6 +26,12 @@ uvicorn[standard]>=0.34
 pydantic>=2.10
 prometheus-client>=0.21
 
+# Monitoring / drift (m08) — evidently PINNED (Report+DataDriftPreset API, works on 3.14)
+evidently==0.4.40
+
+# Security / Vault (m10)
+hvac>=2.3
+
 # Dev
 pytest>=8.0
 pytest-cov>=5.0

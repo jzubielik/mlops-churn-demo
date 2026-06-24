@@ -9,12 +9,12 @@ stages:
       size: 975712
     - path: src/churnml/data.py
       hash: md5
-      md5: 07a404f8f39668c6215c59f9c5adbd2d
-      size: 1439
+      md5: a30935436c3b0bdbbd3b90d92dfb5bb1
+      size: 1429
     - path: src/churnml/prepare.py
       hash: md5
-      md5: e07b4617407b7b8ec832527dca66c7c0
-      size: 1167
+      md5: cf14653d2bcfb6effa4fc142361e3de8
+      size: 1184
     params:
       params.yaml:
         prepare.seed: 42
@@ -35,20 +35,20 @@ stages:
       nfiles: 2
     - path: src/churnml/evaluate.py
       hash: md5
-      md5: afd913d68b9afcaab8ca1c7121113cf6
-      size: 1066
+      md5: f264e7e098c67e8e30a599c4a17ff4c5
+      size: 1079
     - path: src/churnml/features.py
       hash: md5
-      md5: b41adf22481b6dea51cd51087031796d
-      size: 2137
+      md5: 593d452a1f03b2e52b04d891919456c9
+      size: 2150
     - path: src/churnml/model.py
       hash: md5
-      md5: 711a45960ee2fc90941a275f7c7fba06
-      size: 3384
+      md5: 7a3cf3581c95be499842e8e850c946f0
+      size: 3441
     - path: src/churnml/train.py
       hash: md5
-      md5: 09d5e876acc0796094ac468b3a24b4ad
-      size: 2247
+      md5: 3ff770f60be35f96208bffee1d10cae4
+      size: 2227
     params:
       params.yaml:
         train.C: 1.0
