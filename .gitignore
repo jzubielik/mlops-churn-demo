@@ -23,6 +23,7 @@ mlflow.db-journal
 # Build / reports
 build/
 *.html
+site/
 
 # Local DVC remote
 /dvcstore/

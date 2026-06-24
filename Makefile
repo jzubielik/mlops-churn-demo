@@ -33,7 +33,8 @@ COMPOSE_MON := monitoring/docker-compose.yml
         serve predict loadtest docker-build \
         monitor-up monitor-down gen-drift drift \
         infra-init infra-plan infra-apply infra-output infra-destroy \
-        vault-up vault-seed vault-status vault-down scan gitleaks
+        vault-up vault-seed vault-status vault-down scan gitleaks \
+        site
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -208,6 +209,10 @@ gitleaks: ## Scan the repo for secrets (gitleaks via Docker)
 	@echo ">> Gitleaks: searching the repo for secrets"
 	docker run --rm -v "$(CURDIR):/repo" zricethezav/gitleaks:latest \
 		detect --source=/repo --no-git --verbose --redact
+
+# --- m11: documentation + static site (GitHub Pages) -----------------------
+site: ## Build site/index.html (metrics + drift report + cards)
+	$(PY) scripts/build_site.py
 
 clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage
