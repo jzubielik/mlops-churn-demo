@@ -5,8 +5,8 @@ Endpoints:
     GET  /metrics  - Prometheus metrics
     POST /predict  - churn probability for a single customer
 
-The model (sklearn Pipeline from churnml) is loaded at startup from model.joblib
-(in the project directory). The Pipeline does feature engineering + preprocessing
+The model (an sklearn Pipeline from churnml) is loaded at startup from model.joblib
+(in the project directory). The pipeline does feature engineering + preprocessing
 itself, so we accept RAW customer fields and build a single-row DataFrame from them.
 """
 
@@ -41,7 +41,7 @@ PREDICTION_COUNT = Counter(
 )
 REQUEST_LATENCY = Histogram(
     "predict_request_latency_seconds",
-    "Time to handle a prediction request [s]",
+    "Prediction request handling time [s]",
     buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
 )
 # Gauge fed by monitoring/drift_check.py (POST /drift-score) — visible in Grafana.
@@ -57,9 +57,19 @@ STATE: dict = {}
 async def lifespan(app: FastAPI):
     if not MODEL_PATH.exists():
         raise RuntimeError(
-            f"Model not found: {MODEL_PATH}. Train it: make train-model (or make repro)."
+            f"Missing model: {MODEL_PATH}. Train it: make train-model (or make repro)."
         )
     STATE["model"] = joblib.load(MODEL_PATH)
+
+    # m10: service secret fetched from Vault at startup (with a graceful fallback).
+    # Imported locally so that a missing hvac/Vault does not block module import.
+    from serving.vault import read_app_secret
+
+    secret = read_app_secret()
+    STATE["secret_source"] = secret.source
+    STATE["secret_masked"] = secret.masked()
+    print(f"[app] Service secret from: {secret.source} (api_token={secret.masked()})")
+
     STATE["ready"] = True
     yield
     STATE.clear()
@@ -67,7 +77,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Churn — model serving",
-    description="Production skeleton for serving the churn model on FastAPI.",
+    description="Production-grade skeleton for serving the churn model on FastAPI.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -132,7 +142,13 @@ class PredictionResponse(BaseModel):
 @app.get("/health")
 def health() -> JSONResponse:
     ready = STATE.get("ready", False)
-    payload = {"status": "ok" if ready else "loading", "model_loaded": ready}
+    payload = {
+        "status": "ok" if ready else "loading",
+        "model_loaded": ready,
+        # Secret source (vault/fallback) + masked token — safe for logs.
+        "secret_source": STATE.get("secret_source"),
+        "api_token_masked": STATE.get("secret_masked"),
+    }
     return JSONResponse(payload, status_code=200 if ready else 503)
 
 
