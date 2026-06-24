@@ -31,7 +31,8 @@ COMPOSE_MON := monitoring/docker-compose.yml
         train tune promote mlflow-ui \
         train-model gate ci \
         serve predict loadtest docker-build \
-        monitor-up monitor-down gen-drift drift
+        monitor-up monitor-down gen-drift drift \
+        infra-init infra-plan infra-apply infra-output infra-destroy
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -151,6 +152,25 @@ gen-drift: ## Generate cohorts data/reference.csv + data/current.csv (with drift
 
 drift: ## Drift report (Evidently): HTML + push gauge + retrain when > threshold
 	$(PY) monitoring/drift_check.py
+
+# --- m09: Infrastructure as Code (Terraform, local) ------------------------
+TF      ?= terraform
+INFRADIR := infra
+
+infra-init: ## terraform init (infra/ directory)
+	cd $(INFRADIR) && $(TF) init
+
+infra-plan: ## terraform plan (shows what will be created under infra/build/)
+	cd $(INFRADIR) && $(TF) fmt -check && $(TF) validate && $(TF) plan
+
+infra-apply: ## terraform apply -auto-approve (creates churn platform files)
+	cd $(INFRADIR) && $(TF) apply -auto-approve
+
+infra-output: ## terraform output (platform names/paths)
+	cd $(INFRADIR) && $(TF) output
+
+infra-destroy: ## terraform destroy -auto-approve (cleans up infra/build/)
+	cd $(INFRADIR) && $(TF) destroy -auto-approve
 
 clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage

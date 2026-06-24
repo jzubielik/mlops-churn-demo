@@ -1,0 +1,7 @@
+# Terraform — state, cache, and generated artifacts (not version-controlled).
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+build/
+crash.log
