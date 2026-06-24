@@ -1,0 +1,11 @@
+# Automatically wires up the Prometheus data source when Grafana starts.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # The "prometheus" hostname comes from docker-compose (same network).
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

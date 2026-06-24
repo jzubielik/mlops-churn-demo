@@ -24,11 +24,14 @@ SERVE_PORT ?= 17100
 SERVE_URL  ?= http://localhost:$(SERVE_PORT)
 IMAGE      ?= churnml-serving:latest
 
+COMPOSE_MON := monitoring/docker-compose.yml
+
 .PHONY: help install patch-py314 test lint clean \
         data init repro metrics etl etl-bad \
         train tune promote mlflow-ui \
         train-model gate ci \
-        serve predict loadtest docker-build
+        serve predict loadtest docker-build \
+        monitor-up monitor-down gen-drift drift
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -134,6 +137,20 @@ loadtest: ## Load test for /predict (p50/p95/p99)
 
 docker-build: ## Build the multi-stage service image
 	docker build -t $(IMAGE) -f serving/Dockerfile .
+
+# --- m08: monitoring (Prometheus + Grafana) + drift (Evidently) ------------
+monitor-up: ## Bring up the monitoring stack (service + Prometheus :17190 + Grafana :17130)
+	docker compose -f $(COMPOSE_MON) up -d --build
+	@echo "Prometheus: http://localhost:17190  |  Grafana: http://localhost:17130 (admin/admin)"
+
+monitor-down: ## Stop and remove the monitoring stack
+	docker compose -f $(COMPOSE_MON) down -v
+
+gen-drift: ## Generate cohorts data/reference.csv + data/current.csv (with drift)
+	$(PY) scripts/make_drifted.py
+
+drift: ## Drift report (Evidently): HTML + push gauge + retrain when > threshold
+	$(PY) monitoring/drift_check.py
 
 clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage

@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     Counter,
+    Gauge,
     Histogram,
     generate_latest,
 )
@@ -42,6 +43,11 @@ REQUEST_LATENCY = Histogram(
     "predict_request_latency_seconds",
     "Time to handle a prediction request [s]",
     buckets=(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
+# Gauge fed by monitoring/drift_check.py (POST /drift-score) — visible in Grafana.
+LAST_DRIFT_SCORE = Gauge(
+    "last_drift_score",
+    "Last reported share of drifted features (0=none, 1=full drift).",
 )
 
 STATE: dict = {}
@@ -158,9 +164,20 @@ def predict(features: ChurnInput, threshold: float = 0.5) -> PredictionResponse:
         REQUEST_LATENCY.observe(time.perf_counter() - start)
 
 
+class DriftScore(BaseModel):
+    score: float = Field(..., ge=0.0, le=1.0, examples=[0.62])
+
+
+@app.post("/drift-score")
+def set_drift_score(payload: DriftScore) -> dict:
+    """An external drift job updates the gauge visible in Grafana."""
+    LAST_DRIFT_SCORE.set(payload.score)
+    return {"last_drift_score": payload.score}
+
+
 @app.get("/")
 def root() -> dict:
     return {
         "service": "churn-serving",
-        "endpoints": ["/health", "/metrics", "/predict", "/docs"],
+        "endpoints": ["/health", "/metrics", "/predict", "/drift-score", "/docs"],
     }

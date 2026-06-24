@@ -1,0 +1,51 @@
+# Churn monitoring stack: model service (FastAPI) + Prometheus + Grafana.
+# Run from the monitoring/ directory (service build context = project directory).
+#   docker compose -f monitoring/docker-compose.yml up -d   (or: make monitor-up)
+services:
+  app:
+    build:
+      # Context = project root, service Dockerfile (builds the model and serves on 17100).
+      context: ..
+      dockerfile: serving/Dockerfile
+    container_name: churn-serving
+    ports:
+      - "17100:17100"
+    networks:
+      - churn-mon
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: churn-prometheus
+    # UI on the host: http://localhost:17190; inside the container it listens on :9090.
+    ports:
+      - "17190:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - app
+    networks:
+      - churn-mon
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: churn-grafana
+    # UI on the host: http://localhost:17130; inside the container :3000.
+    ports:
+      - "17130:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - churn-mon
+
+networks:
+  churn-mon:
+    driver: bridge
