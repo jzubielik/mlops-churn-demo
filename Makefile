@@ -32,7 +32,8 @@ COMPOSE_MON := monitoring/docker-compose.yml
         train-model gate ci \
         serve predict loadtest docker-build \
         monitor-up monitor-down gen-drift drift \
-        infra-init infra-plan infra-apply infra-output infra-destroy
+        infra-init infra-plan infra-apply infra-output infra-destroy \
+        vault-up vault-seed vault-status vault-down scan gitleaks
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -171,6 +172,42 @@ infra-output: ## terraform output (platform names/paths)
 
 infra-destroy: ## terraform destroy -auto-approve (cleans up infra/build/)
 	cd $(INFRADIR) && $(TF) destroy -auto-approve
+
+# --- m10: security (Vault + scanning) --------------------------------------
+COMPOSE_SEC := security/docker-compose.yml
+SEVERITY    ?= HIGH,CRITICAL
+export VAULT_ADDR  ?= http://127.0.0.1:17200
+export VAULT_TOKEN ?= dev-only-token
+
+vault-up: ## Start Vault (dev) on :17200
+	docker compose -f $(COMPOSE_SEC) up -d vault
+	@echo "Vault is starting on $(VAULT_ADDR) (root token: $(VAULT_TOKEN)). Then: make vault-seed"
+
+vault-seed: ## Write the service secret to Vault KV (churn/app -> api_token)
+	$(PY) scripts/seed_vault.py
+
+vault-status: ## Show Vault status + read the secret (masked)
+	docker compose -f $(COMPOSE_SEC) ps vault
+	$(PY) -c "from serving.vault import read_app_secret; s=read_app_secret(); print('secret from', s.source, '->', s.masked())"
+
+vault-down: ## Stop and remove the Vault container
+	docker compose -f $(COMPOSE_SEC) down -v
+
+scan: docker-build ## Scan the image with Trivy; FAIL on HIGH/CRITICAL (like in CI)
+	@echo ">> Trivy: scanning $(IMAGE), gate on $(SEVERITY) (exit-code 1)"
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy image --severity $(SEVERITY) --ignore-unfixed --exit-code 1 $(IMAGE); \
+	else \
+		echo "trivy not found locally — using the aquasec/trivy image"; \
+		docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+			aquasec/trivy:latest image \
+			--severity $(SEVERITY) --ignore-unfixed --exit-code 1 $(IMAGE); \
+	fi
+
+gitleaks: ## Scan the repo for secrets (gitleaks via Docker)
+	@echo ">> Gitleaks: searching the repo for secrets"
+	docker run --rm -v "$(CURDIR):/repo" zricethezav/gitleaks:latest \
+		detect --source=/repo --no-git --verbose --redact
 
 clean: ## Remove venv, caches and build artifacts
 	rm -rf $(VENV) .pytest_cache .ruff_cache htmlcov .coverage

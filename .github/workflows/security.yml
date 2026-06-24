@@ -1,0 +1,55 @@
+name: security
+
+# Security scanning: serving image (Trivy) + secrets in the repo (Gitleaks).
+#
+# Scanners run via their official Docker images (not GitHub-marketplace actions),
+# so this works on GitHub Actions — no marketplace action
+# resolution and no Gitleaks license requirement.
+#
+# Trivy scans the locally built image via the shared Docker daemon (the runner
+# already builds images, so the daemon socket is available). It REPORTS HIGH/CRITICAL
+# but does not fail the pipeline (--exit-code 0) so the demo stays green; flip to
+# `--exit-code 1` to turn it into a HARD GATE that blocks vulnerable images.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Intentionally NO scheduled weekly re-scan: this is a demo repo, so scans run only
+  # on code changes (push/PR). In production a weekly cron is worthwhile, because new
+  # CVEs appear in unchanged dependencies over time.
+
+permissions:
+  contents: read
+
+jobs:
+  trivy-image-scan:
+    name: Trivy — image scan (HIGH/CRITICAL)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build serving image
+        run: docker build -t churnml-serving:ci -f serving/Dockerfile .
+
+      - name: Trivy scan (report; set --exit-code 1 to gate)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL --ignore-unfixed \
+            --exit-code 0 --format table \
+            churnml-serving:ci
+
+  gitleaks-secret-scan:
+    name: Gitleaks — secret scan in the repo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gitleaks (CLI via Docker — no license required)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect \
+            --source=/repo --no-git --no-banner --redact -v
