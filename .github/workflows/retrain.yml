@@ -1,0 +1,104 @@
+name: retrain
+
+# On-demand drift guardian: regenerates the "future" cohort, checks drift
+# (Evidently) and — if drift exceeds the threshold — retrains the model, runs it
+# through the quality gate, and reports an event (issue) with the drift report as
+# an artifact. Fully on the free runner (synthetic data, no network).
+
+# NOTE — intentionally NO `schedule:` cron.
+# This is a DEMO repo with SYNTHETIC, STATIC data. A scheduled retrain would only
+# re-run the same injected drift on the same data every week — no real signal, just
+# wasted runner minutes (free, but still) and weekly issue noise. In a real system,
+# where production data actually drifts over time, this workflow WOULD run on a cron.
+# Here it is manual (workflow_dispatch) on purpose.
+on:
+  workflow_dispatch:
+    inputs:
+      drift_threshold:
+        description: "Threshold for the share of drifted features (0..1)"
+        required: false
+        default: "0.5"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift-and-retrain:
+    runs-on: ubuntu-latest
+    env:
+      # No retraining inside drift_check — we control it explicitly below.
+      DRIFT_NO_RETRAIN: "1"
+      DRIFT_SHARE_THRESHOLD: ${{ github.event.inputs.drift_threshold || '0.5' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+
+      - name: Ensure baseline model + data
+        run: make train-model
+
+      - name: Generate drifted cohort
+        run: make gen-drift
+
+      - name: Run drift check (Evidently → drift_report.html)
+        id: drift
+        run: |
+          set -o pipefail
+          python monitoring/drift_check.py | tee drift.log
+          share=$(grep -oE 'drift share *: *[0-9.]+' drift.log | grep -oE '[0-9.]+' | tail -1)
+          detected=$(grep -c 'DRIFT DETECTED' drift.log || true)
+          echo "share=${share:-0}" >> "$GITHUB_OUTPUT"
+          echo "detected=${detected:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload drift report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: |
+            drift_report.html
+            drift.log
+
+      - name: Retrain on drift (train-model + quality gate)
+        if: steps.drift.outputs.detected != '0'
+        run: |
+          echo "Drift detected (share=${{ steps.drift.outputs.share }}) — retraining."
+          make train-model
+          make gate
+
+      - name: Open issue on drift
+        if: steps.drift.outputs.detected != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const share = '${{ steps.drift.outputs.share }}';
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              `**Data drift** detected in the scheduled check (share of drifted features: **${share}**).`,
+              ``,
+              `The model has been **retrained** and run through the quality gate (PR-AUC).`,
+              `The Evidently report is available as the **drift-report** artifact in the run: ${run}`,
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Drift detected — retraining (share ${share})`,
+              body,
+              labels: ['drift', 'retrain'],
+            });
+
+      - name: No drift summary
+        if: steps.drift.outputs.detected == '0'
+        run: echo "No significant drift (share=${{ steps.drift.outputs.share }}) — retraining not needed."
