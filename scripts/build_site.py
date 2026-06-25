@@ -71,14 +71,16 @@ def md_to_html(md: str) -> str:
             i += 1
             code: list[str] = []
             while i < n and not lines[i].strip().startswith("```"):
-                code.append(html.escape(lines[i]))
+                code.append(lines[i])
                 i += 1
             i += 1
             if lang == "mermaid":
-                # Rendered client-side by mermaid.js (see <script> in TEMPLATE).
+                # Raw diagram source — fed to mermaid.js (see <script> in TEMPLATE),
+                # NOT escaped, so <br/> line breaks and > in labels survive.
                 out.append('<pre class="mermaid">' + "\n".join(code) + "</pre>")
             else:
-                out.append("<pre><code>" + "\n".join(code) + "</code></pre>")
+                escaped = "\n".join(html.escape(c) for c in code)
+                out.append("<pre><code>" + escaped + "</code></pre>")
             continue
 
         # tables (lines starting with |)

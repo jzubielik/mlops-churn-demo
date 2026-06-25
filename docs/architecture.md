@@ -7,53 +7,63 @@ lifecycle.
 ## Flow diagram
 
 ```mermaid
-flowchart TD
-    subgraph DATA["Data and versioning"]
-        MK["scripts/make_data.py · Telco churn synthesis"] --> RAW["data/raw.csv · (DVC)"]
-        RAW --> ETL["ETL — Prefect · extract→validate→features→load"]
-        ETL -->|Pandera contract| PARQ["data/processed · (parquet)"]
+%%{init: {"theme":"base", "themeVariables":{"fontSize":"24px"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 35, "rankSpacing": 65, "padding": 20, "subGraphTitleMargin": {"top": 14, "bottom": 14}, "curve": "basis"}}}%%
+flowchart TB
+    subgraph DATA["1 · Data &amp; versioning"]
+        direction LR
+        MK["make_data.py<br/>Telco synthesis"] --> RAW["data/raw.csv<br/>(DVC)"] --> ETL["ETL · Prefect<br/>validate→load"] -->|Pandera| PARQ["data/processed<br/>(parquet)"]
     end
 
-    subgraph TRAIN["Training and experiments"]
-        RAW --> PREP["churnml.prepare · train/test split"]
-        PREP --> TR["churnml.train · sklearn Pipeline"]
-        TR --> MLF["MLflow tracking · + churn-clf registry"]
-        MLF --> OPT["Optuna tuning (PR-AUC)"]
-        OPT --> PROMO["promote → alias @production"]
-        TR --> MODEL["model.joblib · + metrics.json"]
+    subgraph TRAIN["2 · Training &amp; experiments"]
+        direction LR
+        PREP["prepare<br/>train/test split"] --> TR["train<br/>sklearn Pipeline"] --> MLF["MLflow + Optuna<br/>registry"] --> PROMO["promote<br/>@production"]
+        TR --> MODEL["model.joblib<br/>+ metrics.json"]
     end
 
-    subgraph GATE["Quality gate and CI"]
-        MODEL --> G["scripts/gate.py · pr_auc > baseline?"]
+    subgraph GATE["3 · Quality gate &amp; CI"]
+        direction LR
+        CI["CI · lint→test<br/>→train→gate"] --> G{"gate.py<br/>pr_auc > baseline?"}
         G -->|yes| OK["deploy allowed"]
         G -->|no| STOP["pipeline FAIL"]
-        CI["CI: lint→test→train→gate→build"] --> G
     end
 
-    subgraph SERVE["Serving"]
-        MODEL --> APP["FastAPI :17100 · /predict /health /metrics /drift-score"]
-        VAULT["Vault :17200 · (api_token secret)"] -->|startup| APP
+    subgraph SERVE["4 · Serving &amp; monitoring"]
+        direction LR
+        VAULT["Vault :17200"] -->|startup| APP["FastAPI :17100<br/>/predict /metrics"] --> PROM["Prometheus<br/>:17190"] --> GRAF["Grafana :17130<br/>QPS · p99 · drift"]
     end
 
-    subgraph MON["Monitoring and drift"]
-        APP -->|/metrics| PROM["Prometheus :17190"]
-        PROM --> GRAF["Grafana :17130 · QPS · p99 · drift gauge"]
-        DRIFT["Evidently drift_check · reference vs current"] -->|/drift-score| APP
+    subgraph MON["5 · Drift &amp; retrain"]
+        direction LR
+        DRIFT["Evidently<br/>drift_check"] -->|drift > thr| RETR["retrain<br/>+ gate"]
         DRIFT --> RPT["drift_report.html"]
-        DRIFT -->|drift > threshold| RETR["retrain · train-model + gate"]
+        CRON["retrain.yml<br/>(cron)"] --> DRIFT
     end
 
-    subgraph OPS["Platform and ops"]
-        TF["Terraform infra/ · bucket · registry · env-config"]
-        SCAN["Trivy + Gitleaks · (security CI)"]
-        PAGES["Report site · (Pages / artifact)"]
-        CRON["retrain.yml (cron)"]
+    subgraph OPS["6 · Platform &amp; reports"]
+        direction LR
+        INFRA["Terraform infra/<br/>Trivy · Gitleaks"]
+        PAGES["Report site<br/>(Pages)"]
     end
 
-    RETR --> MODEL
+    RAW --> PREP
+    MODEL --> G
+    OK --> APP
+    APP -.->|/drift-score| DRIFT
+    RETR -.-> MODEL
     MODEL --> PAGES
     RPT --> PAGES
-    CRON --> DRIFT
+
+    classDef data fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+    classDef train fill:#dcfce7,stroke:#16a34a,stroke-width:2px;
+    classDef gate fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    classDef serve fill:#fae8ff,stroke:#a21caf,stroke-width:2px;
+    classDef ops fill:#e2e8f0,stroke:#64748b,stroke-width:2px;
+    class MK,RAW,ETL,PARQ data;
+    class PREP,TR,MLF,PROMO,MODEL train;
+    class CI,G,OK,STOP gate;
+    class VAULT,APP,PROM,GRAF serve;
+    class DRIFT,RETR,RPT,CRON serve;
+    class INFRA,PAGES ops;
 ```
 
 ## Mapping to the MLOps lifecycle
