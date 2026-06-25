@@ -1,11 +1,9 @@
 # MLOps Churn Demo
 
-[![CI](https://github.com/OWNER/mlops-churn-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/mlops-churn-demo/actions/workflows/ci.yml)
-[![security](https://github.com/OWNER/mlops-churn-demo/actions/workflows/security.yml/badge.svg)](https://github.com/OWNER/mlops-churn-demo/actions/workflows/security.yml)
-[![pages](https://github.com/OWNER/mlops-churn-demo/actions/workflows/pages.yml/badge.svg)](https://github.com/OWNER/mlops-churn-demo/actions/workflows/pages.yml)
+[![CI](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/ci.yml)
+[![security](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/security.yml/badge.svg)](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/security.yml)
+[![pages](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/pages.yml/badge.svg)](https://github.com/jzubielik/mlops-churn-demo/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-> Replace `OWNER` with the repo owner so the badges come alive after pushing to GitHub.
 
 An end-to-end **MLOps** demo on a real business problem: **customer churn
 prediction** for a telecom operator. A full, production-grade ML
